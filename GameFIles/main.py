@@ -3,9 +3,11 @@ import os
 import random as ran
 import sys
 
+import tensorflow as tf
+from tensorflow import keras
+
 import numpy as np
 import pygame.font, pygame.event, pygame.draw
-
 
 
 pygame.init()
@@ -16,7 +18,7 @@ blue_gray = (45, 45, 60)
 white = (255, 255, 255)
 orange = (255, 128, 10)
 bright_orange = (255, 170, 50)
-green = (40, 255, 15)
+red = (255, 0, 0)
 
 width, height = 914, 612
 size = [width, height]
@@ -45,21 +47,21 @@ font = pygame.font.SysFont("Agency FB", 40)
 font_small = pygame.font.SysFont("Agency FB", 32)
 clock = pygame.time.Clock()
 
-
 def calculate_image(background):
-    """ transforms the image into an array ready for matmult """
+    """transforms the image into an array ready for matmult"""
 
     scaledBackground = pygame.transform.smoothscale(background, (28, 28))
     image = pygame.surfarray.array3d(scaledBackground)
-    image = abs(1-image/253)
+    image = abs(1 - image / 253)
     image = np.mean(image, 2)
 
     pixelate(image)
 
-    image = image.transpose()
-    image = image.ravel()
-    return image
-
+    # Add a fourth dimension to the image to match the expected shape
+    image_with_channels = np.expand_dims(image, axis=-1)
+    image_with_channels = np.repeat(image_with_channels, 4, axis=-1)  # Assuming RGB channels
+    image_with_batch = np.expand_dims(image_with_channels, axis=0)  # Add batch dimension
+    return image_with_batch
 
 
 def display_prediction(prediction, prob):
@@ -79,21 +81,19 @@ def display_prediction(prediction, prob):
     screen.blit(initialize_probability, (edge_buffer[0] + 5, input_field[1] + edge_buffer[1] + 60))
 
 def pixelate(image):
-    """ pixelates image """
+    """Pixelates image"""
 
     size = 28
-    image = image.ravel()
 
-    # creates RGB values for each pixel
-    image = (255-image*255)
+    # Create RGB values for each pixel
+    image = (255 - image * 255).astype(np.uint8)  # Assuming the image is already in grayscale
 
-    # draws rect for each pixel
-    for column in range(size):
-        for row in range(size):
-            # 0 - size**2
-            index = row*size + column
-            base_rgb = int(image[index])
+    # Draw rect for each pixel
+    for row in range(size):
+        for column in range(size):
+            base_rgb = int(image[row, column])
 
+            # Append coordinates and pixel colors
             x_coordinates.append(row)
             y_coordinates.append(column)
             pixel_colors.append(base_rgb)
@@ -116,124 +116,108 @@ def draw_gradient():
 
 
 
-def loader():
-    """ displays loading bar on screen """
-
-    loader = ""
-
-    for i in range(35):
-
-        timer = ran.uniform(0.03, 0.1)
-        loader += "/"
-
-        initialize_loader = font_small.render(loader, 1, orange)
-        loadscreen_loader_dim = initialize_loader.get_rect().width, initialize_loader.get_rect().height
-
-        # redraw screen to prevent overlap of loader
-        screen.blit(initialize_loader, (half_width - 105, half_height - 21))
-
-        # update screen
-        pygame.display.flip()
-        time.sleep(timer)
-
-    screen.blit(backdrop, (0, 0))
-    pygame.display.flip()
-
 def calculate_prediction(image):
-    display_prediction("test","test")
-    pass
+    new_model = tf.keras.models.load_model('SavedModels/NN.h5')
+    prediction = new_model.predict(image)
+    prediction_class = np.argmax(prediction)
+    probability = round(np.max(prediction) * 100, 2)
+
+    # Display the prediction and probability
+    display_prediction(prediction_class, probability)
 
 def scanner():
-    """ creates visual scanner for user input """
+    """ Creates visual scanner for user input """
 
     changeY = 0
     speed = 0.003
 
-    # used to call values that stores data for each pixel
+    # Used to call values that store data for each pixel
     coordinate_x = 1
     coordinate_y = 1
     px = 1
 
-    for x in range(int(input_field[0]/2)):
+    for x in range(int(input_field[0] / 2)):
 
-        # draw background each time to overdraw scanner
-        screen.blit(background,(edge_buffer))
-        pygame.draw.rect(screen, green, (edge_buffer[0], edge_buffer[1] + changeY, input_field[0], 5))
+        # Draw background each time to overdraw scanner
+        screen.blit(background, (edge_buffer))
+        pygame.draw.rect(screen, red, (edge_buffer[0], edge_buffer[1] + changeY, input_field[0], 5))
         changeY += 2
 
-        # every 7 iterations, draws line of pixelated image
+        # Every 7 iterations, draw a line of pixelated image
         if changeY % 14 == 0:
 
-            # staggers the pixelated image
-            if (changeY/14) % 2 == 0:
-
+            # Stagger the pixelated image
+            if (changeY / 14) % 2 == 0:
                 coordinate_x += 1
                 coordinate_y += 1
                 px += 1
-
             else:
-
                 coordinate_x -= 1
                 coordinate_y -= 1
                 px -= 1
 
             for i in range(14):
-
-                gray_scaled = (pixel_colors[px], pixel_colors[px], pixel_colors[px])
-                pygame.draw.rect(screen, gray_scaled, (x_coordinates[coordinate_x]*scale_size + input_field[0] + 2*edge_buffer[0],
-                y_coordinates[coordinate_y]*scale_size + edge_buffer[1], scale_size, scale_size))
-
+                # Check if the index is within the valid range
+                if px < len(pixel_colors):
+                    gray_scaled = (pixel_colors[px], pixel_colors[px], pixel_colors[px])
+                    pygame.draw.rect(screen, gray_scaled, (
+                        x_coordinates[coordinate_x] * scale_size + input_field[0] + 2 * edge_buffer[0],
+                        y_coordinates[coordinate_y] * scale_size + edge_buffer[1], scale_size, scale_size))
                 coordinate_x += 2
                 coordinate_y += 2
                 px += 2
 
-        # draws rectange same as background to compensate for overlap of scanner
-        pygame.draw.rect(screen, gray, (edge_buffer[0], edge_buffer[1] + input_field[1], input_field[0], 10))\
+        # Draw rectangle same as background to compensate for overlap of scanner
+        pygame.draw.rect(screen, gray, (edge_buffer[0], edge_buffer[1] + input_field[1], input_field[0], 10))
 
-        # update the screen
+        # Update the screen
         time.sleep(speed)
         pygame.display.flip()
-    # goes from down to up
+
+    # Goes from down to up
     coordinate_x = 783
     coordinate_y = 783
     px = 783
 
-    for x in range(int(input_field[0]/2)):
+    for x in range(int(input_field[0] / 2)):
 
-        screen.blit(background,(edge_buffer))
-        pygame.draw.rect(screen, green, (edge_buffer[0], edge_buffer[1] + changeY, input_field[0], 5))
+        screen.blit(background, (edge_buffer))
+        pygame.draw.rect(screen, red, (edge_buffer[0], edge_buffer[1] + changeY, input_field[0], 5))
         changeY -= 2
 
-        # every 7 iterations, draws line of pixelated image
+        # Every 7 iterations, draw a line of pixelated image
         if changeY % 14 == 0:
 
-            # staggers the pixelated image, opposite of the first scanner
-            if (changeY/14) % 2 == 0:
+            # Stagger the pixelated image, opposite of the first scanner
+            if (changeY / 14) % 2 == 0:
                 coordinate_x += 1
                 coordinate_y += 1
                 px += 1
-
             else:
                 coordinate_x -= 1
                 coordinate_y -= 1
                 px -= 1
 
-            # fills in remaining pixels on way up
+            # Fill in remaining pixels on the way up
             for i in range(14):
-                gray_scaled = (pixel_colors[px], pixel_colors[px], pixel_colors[px])
-                pygame.draw.rect(screen, gray_scaled, (x_coordinates[coordinate_x]*scale_size + input_field[0] + 2*edge_buffer[0],
-                y_coordinates[coordinate_y]*scale_size + edge_buffer[1], scale_size, scale_size))
+                # Check if the index is within the valid range
+                if px < len(pixel_colors):
+                    gray_scaled = (pixel_colors[px], pixel_colors[px], pixel_colors[px])
+                    pygame.draw.rect(screen, gray_scaled, (
+                        x_coordinates[coordinate_x] * scale_size + input_field[0] + 2 * edge_buffer[0],
+                        y_coordinates[coordinate_y] * scale_size + edge_buffer[1], scale_size, scale_size))
                 coordinate_x -= 2
                 coordinate_y -= 2
                 px -= 2
-        # prevents scanner from going past background and staying on screen
+
+        # Prevent scanner from going past background and staying on screen
         pygame.draw.rect(screen, gray, (edge_buffer[0], edge_buffer[1] + input_field[1], input_field[0], 10))
 
-        # update screen at a set pace
+        # Update screen at a set pace
         time.sleep(speed)
         pygame.display.flip()
 
-    # clear lists holding pixel data
+    # Clear lists holding pixel data
     x_coordinates[:] = []
     y_coordinates[:] = []
     pixel_colors[:] = []
@@ -288,7 +272,6 @@ def draw_line(surface, color, start, end, radius):
 def draw_interface():
     """ draws main components of interface """
 
-    loader()
     display_prediction('Unknown', "0")
 
     label_input = "Input"
