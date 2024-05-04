@@ -140,6 +140,7 @@ def loader():
     pygame.display.flip()
 
 def calculate_prediction(image):
+    display_prediction("test","test")
     pass
 
 def scanner():
@@ -331,10 +332,10 @@ def main():
                 last_pos = event.pos
 
             # update screen
-            screen.blit(background, (edge_buffer[0], edge_buffer[1]))
-            create_button("Classify", screen, orange, bright_orange, input_field[0] - 110, input_field[1] + edge_buffer[1] + 10, 120, 45)
-            create_button("Clear", screen, orange, bright_orange, input_field[0] - 110, input_field[1] + edge_buffer[1] + 55, 120, 45)
-            pygame.display.flip()
+        screen.blit(background, (edge_buffer[0], edge_buffer[1]))
+        create_button("Classify", screen, orange, bright_orange, input_field[0] - 110, input_field[1] + edge_buffer[1] + 10, 120, 45)
+        create_button("Clear", screen, orange, bright_orange, input_field[0] - 110, input_field[1] + edge_buffer[1] + 55, 120, 45)
+        pygame.display.flip()
 
-while True:
+if __name__ == "__main__":
     main()
