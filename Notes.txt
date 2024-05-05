@@ -1,0 +1,4 @@
+Process:
+    - Messed with the batch size and epochs, found that too small of a batch would lose accuracy, while too big would lose accuracy 10-50
+    - Changed the architecture to input-conv-maxpooling-conv-maxpooling-flatten-fullyconnect-fullyconnect-output
+    - changed optimizer to adam
