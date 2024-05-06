@@ -121,7 +121,7 @@ def calculate_prediction(image):
     prediction = new_model.predict(image)
     prediction_class = np.argmax(prediction)
     probability = round(np.max(prediction) * 100, 2)
-
+    print(new_model.predict(image))
     # Display the prediction and probability
     display_prediction(prediction_class, probability)
 
