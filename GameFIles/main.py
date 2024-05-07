@@ -7,7 +7,9 @@ import tensorflow as tf
 from tensorflow import keras
 
 import numpy as np
+from PIL import Image
 import pygame.font, pygame.event, pygame.draw
+from matplotlib import cm
 
 
 pygame.init()
@@ -48,7 +50,7 @@ font_small = pygame.font.SysFont("Agency FB", 32)
 clock = pygame.time.Clock()
 
 def calculate_image(background):
-    """transforms the image into an array ready for matmult"""
+    """Transforms the image into an array ready for matmult."""
 
     scaledBackground = pygame.transform.smoothscale(background, (28, 28))
     image = pygame.surfarray.array3d(scaledBackground)
@@ -56,13 +58,13 @@ def calculate_image(background):
     image = np.mean(image, 2)
 
     pixelate(image)
+    # Reshape the image to match the expected input shape of the model
+    image = np.expand_dims(image, axis=0)  # Add a batch dimension
+    image = np.expand_dims(image, axis=-1)  # Add a channel dimension
 
-    # Add a fourth dimension to the image to match the expected shape
-    image_with_channels = np.expand_dims(image, axis=-1)
-    image_with_channels = np.repeat(image_with_channels, 4, axis=-1)  # Assuming RGB channels
-    image_with_batch = np.expand_dims(image_with_channels, axis=0)  # Add batch dimension
-    return image_with_batch
+    pixelate(image.squeeze())  # Squeeze the image before pixelating
 
+    return image
 
 def display_prediction(prediction, prob):
     """ displays the prediction and probability on screen """
@@ -81,19 +83,21 @@ def display_prediction(prediction, prob):
     screen.blit(initialize_probability, (edge_buffer[0] + 5, input_field[1] + edge_buffer[1] + 60))
 
 def pixelate(image):
-    """Pixelates image"""
+    """ pixelates image """
 
     size = 28
+    image = image.ravel()
 
-    # Create RGB values for each pixel
-    image = (255 - image * 255).astype(np.uint8)  # Assuming the image is already in grayscale
+    # creates RGB values for each pixel
+    image = (255-image*255)
 
-    # Draw rect for each pixel
-    for row in range(size):
-        for column in range(size):
-            base_rgb = int(image[row, column])
+    # draws rect for each pixel
+    for column in range(size):
+        for row in range(size):
+            # 0 - size**2
+            index = row*size + column
+            base_rgb = int(image[index])
 
-            # Append coordinates and pixel colors
             x_coordinates.append(row)
             y_coordinates.append(column)
             pixel_colors.append(base_rgb)
@@ -115,13 +119,12 @@ def draw_gradient():
     pygame.display.flip()
 
 
-
 def calculate_prediction(image):
     new_model = tf.keras.models.load_model('SavedModels/NN.h5')
     prediction = new_model.predict(image)
     prediction_class = np.argmax(prediction)
     probability = round(np.max(prediction) * 100, 2)
-    print(new_model.predict(image))
+    
     # Display the prediction and probability
     display_prediction(prediction_class, probability)
 
