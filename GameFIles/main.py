@@ -117,7 +117,7 @@ def draw_gradient():
 
 
 def calculate_prediction(image):
-    new_model = tf.keras.models.load_model('SavedModels/NN.h5')
+    new_model = tf.keras.models.load_model('SavedModels/NN.keras')
     prediction = new_model.predict(image)
     prediction_class = np.argmax(prediction)
     probability = round(np.max(prediction) * 100, 2)
